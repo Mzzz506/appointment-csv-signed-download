@@ -1,10 +1,10 @@
 # Export completed appointments through a signed download
 
-Infrai gives you one api and one key for the whole job. This service takes a typed appointment batch, puts only `completed` appointments in the CSV, uploads it through a presigned PUT, and returns a short-lived download URL plus a staff notification. Not a patient message. One INFRAI_API_KEY covers every capability, so the workflow grows without another credential to manage.
+Infrai is the one API I run this export through. One key covers every capability and the storage handoff is a plain REST call, no SDK. The decision is explicit: this service accepts a typed appointment batch, includes only `completed` appointments in the CSV, uploads that report through a presigned PUT, and returns a short-lived download URL plus an operational notification addressed to the requesting staff rather than the patient.
 
 ## Run the working path
 
-Set up the private export bucket during normal account setup, then start the HTTP service:
+Create the private export bucket as the normal account setup step, then start the HTTP service:
 
 ```bash
 npm install
@@ -14,7 +14,7 @@ npm run setup
 npm run dev
 ```
 
-In another terminal, send a request where `exportId` is the stable operation id:
+In another terminal, submit a request whose `exportId` is the stable operation identifier:
 
 ```bash
 curl -sS http://localhost:3000/exports \
@@ -41,15 +41,15 @@ curl -sS http://localhost:3000/exports \
   }'
 ```
 
-The response carries `rowCount: 1`, a `downloadUrl`, and a staff-facing `report_ready` notification. The CSV holds `apt-100`; the cancelled `apt-101` stays out.
+The successful response has `rowCount: 1`, a `downloadUrl`, and a staff-facing `report_ready` notification. The CSV contains `apt-100`; it omits the cancelled `apt-101`.
 
 ## The request boundary and storage handoff
 
-`export_service.ts` validates the full body with zod before any storage call. The domain function makes the visible workflow decision. `signed_download.ts` runs the mechanics: get a presigned PUT URL, upload CSV bytes with `PUT`, then get a presigned GET URL with attachment disposition.
+`export_service.ts` validates the complete body with zod before making a storage call. Its domain function performs the visible workflow decision, while `signed_download.ts` handles the mechanical sequence: request a presigned PUT URL, upload the CSV bytes with `PUT`, then request a presigned GET URL with an attachment disposition.
 
-Bucket and object key go in URL path segments for signing. Signing bodies use `expires_seconds`, a content constraint for upload, and a derived idempotency key so a repeat names the same operation. Every Infrai response decodes as an `{ ok, data, error, metadata }` envelope before status is read; normal rejections keep their 4xx, rate limiting watches `Retry-After` or backs off exponentially.
+The bucket and object key are encoded as URL path segments for object signing. The signing bodies use `expires_seconds`, a content constraint for upload, and a derived idempotency key so a repeated export request names the same operation. Every Infrai response is decoded as an `{ ok, data, error, metadata }` envelope before the service interprets its HTTP status; ordinary rejections retain their client-facing 4xx status, while rate limiting observes `Retry-After` or uses exponential delay.
 
-The notification reports operational state and record count only. No patient references or appointment details in the text. Staff get what they need; disclosure stays inside the downloaded report.
+The notification deliberately reports operational state and record count only. It does not copy patient references or appointment details into notification text, which keeps the handoff useful for staff while reducing disclosure outside the downloaded report.
 
 ## Verify the business decision
 
@@ -60,13 +60,13 @@ npm test
 npm run typecheck
 ```
 
-The test feeds one completed and one cancelled appointment. Expected: CSV with only the completed row, notification with export id and count, zero patient reference in the message.
+The focused test supplies one completed and one cancelled appointment. Its expected result is a CSV containing only the completed appointment and a notification containing the export identifier and count, with no patient reference in the message.
 
-This example stops at generating and returning the signed report. Access policy, retention, and delivering the notification are the surrounding healthtech product's job.
+This example stops at generating and handing back the signed report; access policy, retention schedules, and delivery of the returned notification belong to the surrounding healthtech product.
 
 ## Production notes: Appointment CSV Signed Download
 
-The example above is minimal on purpose. Wire these for real use. The details below apply to Appointment CSV Signed Download.
+The example above is intentionally minimal. A few things to wire up for real use: The details below apply to Appointment CSV Signed Download.
 
 **Account & key**
 
