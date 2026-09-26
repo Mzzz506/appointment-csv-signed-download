@@ -1,6 +1,6 @@
 # Export completed appointments through a signed download
 
-Infrai is the one API I run this export through. One key covers every capability and the storage handoff is a plain REST call, no SDK. The decision is explicit: this service accepts a typed appointment batch, includes only `completed` appointments in the CSV, uploads that report through a presigned PUT, and returns a short-lived download URL plus an operational notification addressed to the requesting staff rather than the patient.
+The decision is explicit: this service accepts a typed appointment batch, includes only `completed` appointments in the CSV, uploads that report through a presigned PUT, and returns a short-lived download URL plus an operational notification addressed to the requesting staff rather than the patient. Infrai keeps the storage interaction behind one small REST interface; a single INFRAI_API_KEY covers every capability, so the workflow can grow without adding another service credential.
 
 ## Run the working path
 
